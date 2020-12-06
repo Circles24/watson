@@ -6,7 +6,10 @@ from datetime import timedelta
 from bs4 import BeautifulSoup
 from bs4.element import Comment
 from celery import shared_task
+from .stop_words import stop_words
 
+import time
+import random
 import logging
 import requests
 import os
@@ -20,10 +23,18 @@ formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(messag
 fh.setFormatter(formatter)
 logger.addHandler(fh)
 
+headers = {
+    'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/56.0.2924.87 Safari/537.36',
+    'referrer': 'https://google.com',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Pragma': 'no-cache',
+}
 
 def is_url_valid(url):
     try:
-        res = requests.head(url)
+        res = requests.head(url, headers=headers)
         is_status_valid = res.status_code == 200
         is_header_valid = False
         possible_headers = ['content-type', 'Content-Type', 'Content-type', 'CONTENT-TYPE']
@@ -47,6 +58,10 @@ def get_text_from_soup(soup):
     visible_texts = filter(tag_visible, texts)  
     return u" ".join(t.strip() for t in visible_texts)
 
+def random_delay():
+    delays = [7, 4, 6, 2, 10, 19]
+    delay = random.choice(delays)
+    time.sleep(delay)
 
 def crawl_data(url, levels, token_file):
 
@@ -74,13 +89,15 @@ def crawl_data(url, levels, token_file):
         logger.info(f'level:::{level} url:::{url} need_to_crawl:::{need_to_crawl}')
 
         if need_to_crawl == True:
-            html_content = requests.get(url).content
+            random_delay()
+            html_content = requests.get(url, headers=headers).content
             soup = BeautifulSoup(html_content, 'html.parser')
             text = get_text_from_soup(soup)
             links = soup.findAll('a')
 
             for link in links:
                 try:
+                    random_delay()
                     if link['href'].startswith('http') and is_url_valid(url) == True:
                             urls.append(link['href'])
                     elif link['href'].startswith('/'):
@@ -115,7 +132,7 @@ def digest_token_file(token_file):
     lines = token_file.readlines()
     freq_data = {}
     for line in lines:
-        words = lines.split()
+        words = line.split()
         for word in words:
             if word not in stop_words:
                 if word in freq_data.keys():
@@ -134,6 +151,8 @@ def start_processing(task_id):
     task.status = 'i'
     task.save()
     crawl_data(task.url, task.level, token_file)
+    token_file.close()
+    token_file = open(os.path.join(settings.DATA_DUMP, f'{task_id}.txt'), 'r')
     freq_data = digest_token_file(token_file)
     token_file.close()
     task.freq_data = freq_data
