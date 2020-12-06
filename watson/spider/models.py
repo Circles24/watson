@@ -10,10 +10,10 @@ class Task(models.Model):
     status = models.CharField(default='p', max_length=1, choices=status_choices)
     started_at = models.DateTimeField(default=timezone.now)
     finished_at = models.DateTimeField(null=True)
-    freq_data = {}
+    freq_data = models.JSONField(default=dict)
 
 class Page(models.Model):
     url = models.CharField(max_length=200)
     text = models.TextField()
     last_updated_at = models.DateTimeField()
-
+    urls = models.JSONField(default=list)

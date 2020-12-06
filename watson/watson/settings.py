@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/3.1/ref/settings/
 
 from pathlib import Path
 from datetime import timedelta
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -160,3 +161,6 @@ SIMPLE_JWT = {
 
 
 STATIC_URL = '/static/'
+
+DATA_DUMP = os.path.join(BASE_DIR, 'data_dump')
+CRAWLER_LOG_FILE = 'crawler.log'

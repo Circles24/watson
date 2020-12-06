@@ -14,4 +14,4 @@ def register(request):
 
     except Exception as ex:
         print('internal server error -> ', ex)
-        return Response(str(ex), 500)
+        return Response({'msg':'internal server error'}, 500)
