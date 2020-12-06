@@ -71,61 +71,67 @@ def crawl_data(url, levels, token_file):
     while process_queue.empty() == False:
 
         data = process_queue.get()
-        level = data['level']
-        url = data['url']
-        page = None
-        urls = []
-        text = None
-        need_to_crawl = True
-
-        if Page.objects.filter(url=url).count() > 0:
-            page = Page.objects.filter(url=url).first()
-            delta = timezone.now()-page.last_updated_at
-            if delta.days <= 3:
-                text = page.text
-                urls = page.urls
-                need_to_crawl = False
         
-        logger.info(f'level:::{level} url:::{url} need_to_crawl:::{need_to_crawl}')
+        try:
 
-        if need_to_crawl == True:
-            random_delay()
-            html_content = requests.get(url, headers=headers).content
-            soup = BeautifulSoup(html_content, 'html.parser')
-            text = get_text_from_soup(soup)
-            links = soup.findAll('a')
+            level = data['level']
+            url = data['url']
+            page = None
+            urls = []
+            text = None
+            need_to_crawl = True
 
-            for link in links:
-                try:
-                    random_delay()
-                    if link['href'].startswith('http') and is_url_valid(url) == True:
-                            urls.append(link['href'])
-                    elif link['href'].startswith('/'):
-                        temp_url = url+link['href']
-                        if is_url_valid(temp_url) == True:
-                            urls.append(temp_url)
+            if Page.objects.filter(url=url).count() > 0:
+                page = Page.objects.filter(url=url).first()
+                delta = timezone.now()-page.last_updated_at
+                if delta.days <= 3:
+                    text = page.text
+                    urls = page.urls
+                    need_to_crawl = False
+            
+            logger.info(f'level:::{level} url:::{url} need_to_crawl:::{need_to_crawl}')
 
-                except Exception as ex:
-                    logger.error(f'level:::{level} url:::{url} error while processing links::{ex}')
+            if need_to_crawl == True:
+                random_delay()
+                html_content = requests.get(url, headers=headers).content
+                soup = BeautifulSoup(html_content, 'html.parser')
+                text = get_text_from_soup(soup)
+                links = soup.findAll('a')
+
+                for link in links:
+                    try:
+                        random_delay()
+                        if link['href'].startswith('http') and is_url_valid(url) == True:
+                                urls.append(link['href'])
+                        elif link['href'].startswith('/'):
+                            temp_url = url+link['href']
+                            if is_url_valid(temp_url) == True:
+                                urls.append(temp_url)
+
+                    except Exception as ex:
+                        logger.error(f'level:::{level} url:::{url} error while processing links::{ex}')
 
 
 
-        logger.info(f'level:::{level} url:::{url} processed webpage')
-        token_file.writelines(text) 
-        
-        if level+1 < levels:
-            for url in urls:
-                if is_url_valid(url):
-                    logger.info(f'level:::{level+1} url:::{url} added url')
-                    process_queue.put({'level':level+1, 'url':url})
+            logger.info(f'level:::{level} url:::{url} processed webpage')
+            token_file.writelines(text) 
+            
+            if level+1 <= levels:
+                for url in urls:
+                    if is_url_valid(url):
+                        logger.info(f'level:::{level+1} url:::{url} added url')
+                        process_queue.put({'level':level+1, 'url':url})
 
-        if page is None:
-            page = Page.objects.create(url=url, text=text, urls=urls, last_updated_at=timezone.now())
-        elif need_to_crawl == True:
-            page.text = text
-            page.urls = urls
-            page.last_updated_at = timezone.now()
-            page.save()
+            if page is None:
+                page = Page.objects.create(url=url, text=text, urls=urls, last_updated_at=timezone.now())
+            elif need_to_crawl == True:
+                page.text = text
+                page.urls = urls
+                page.last_updated_at = timezone.now()
+                page.save()
+
+        except Exception as ex:
+            logger.error(f'level:::{level} url:::{url} error while processing given web page')
 
 def digest_token_file(token_file):
     logger.info(f'digesting tokens')
